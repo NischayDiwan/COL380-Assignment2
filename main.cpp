@@ -6,12 +6,16 @@ using namespace std;
 int main(int argc, char* argv[]){
 
 	int i, j, k, n, m, tmp;
+	// time measure variables
+	double startt, endt;
 
 	MPI_Init(&argc, &argv);
 	int id, sz;
 	MPI_Comm_rank(MPI_COMM_WORLD, &id);
 	MPI_Comm_size(MPI_COMM_WORLD, &sz);
+	startt = MPI_Wtime();
 
+	// read input arguments
 	string header = argv[3];
 	header = header.substr(13, header.length() - 13);	// check 13 ?!
 	string filename = argv[2];
@@ -119,6 +123,11 @@ int main(int argc, char* argv[]){
 
 	// re-check correctness of vertex allocation
 
+	// time measure
+	endt = MPI_Wtime();
+	if(id == 0){
+		cout << "Time taken: " << endt - startt << "\n";
+	}
 	MPI_Finalize();
 	return 0;
 }

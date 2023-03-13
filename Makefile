@@ -1,5 +1,5 @@
 all:
-	mpic++ main.cpp
+	mpic++ main.cpp -std=c++17
 clean:
 	rm a.out
 run:

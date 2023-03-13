@@ -13,8 +13,7 @@ int main(int argc, char* argv[]){
 	string header = argv[3].substr(13, argv[3].length - 13);	// check 13 ?!
 	string filename = argv[2].substr(12, argv[2].length - 12);
 
-	startk = atoi(argv[6]);
-	endk = atoi(argv[7]);
+	int startk = atoi(argv[6]), endk = atoi(argv[7]);
 
 	// print the above values on sample file	
 

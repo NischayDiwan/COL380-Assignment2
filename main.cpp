@@ -5,7 +5,7 @@ using namespace std;
 
 int main(int argc, char* argv[]){
 
-	int i, j, n, m, tmp;
+	int i, j, k, n, m, tmp;
 
 	MPI_Init(&argc, &argv);
 	int id, sz;
@@ -55,42 +55,67 @@ int main(int argc, char* argv[]){
 
 	// assign vertices to the nodes [ based modulo size ]
 	// node i gets vertices [i, sz + i, 2*sz + i, ...]  ----> check stupid cases ( sz = 1 , seems ok)
+	// BUT THIS HAS TO BE MADE ACCORDING TO ASCENDING ORDER OF DEGREE
 	// edge e = (u, v) then e belongs to processor having lower priority vertex
 	vector<int> V;
 	for(i = id; i < n; i += sz){
-		V.push_back(i);
+		V.push_back(deg[i].second);
 	}
 
 	int num_nodes = V.size();
-	vector<int> E[num_nodes];	// E[u] will stores edges (u, v) with u < v
+	vector<int> E[num_nodes];	// E[u] will stores edges (u, v) with u < v 
+	unordered_set<int> htable[num_nodes];
+	// maybe replace this with faster hash tables?
 
 	infile.open(filename, ios:: in | ios::binary);
+	int count = 0;
 	for(auto v: V){
 		infile.seekg(offset[v] + 4, ios::beg);
 		infile.read(reinterpret_cast<char *>(&tmp), 4);
 		for(i = 0; i < tmp; i++){
 			infile.read(reinterpret_cast<char *>(&j), 4);
 			if(prio[j] > prio[v]){
-				// cout << v << " " << j << endl;
-				E[(v - id)/sz].push_back(j);
+				E[count].push_back(j);
+				htable[count].insert(j);
 			}
 		}
+		count += 1;
 	}
 	infile.close();
 
-	// cout << id << " " << sz << endl;
-	for(i = 0; i < num_nodes; i++){
-		string output = "";
-		for(auto u: E[i]){
-			cout << u << " ";
-			output += u;
+	// triangle enumeration
+	infile.open(filename, ios::in | ios::binary);
+	unordered_map<int, int> processed;
+	for(auto u: V){
+		for(i = 0; i < E[u].size(); i++){
+			for(j = i + 1; j < E[u].size(); j++){	// have to go over all ???
+				//if(i == j)	
+				//	continue;
+				int v = E[u][i];
+				int w = E[u][j];
+				// check if (v, w) was already processed with edge from v to w in processor containing v
+				//if(processed.find(w)!=processed.end() && processed[w]==v)
+				//	continue;
+				// send msg to processor owning v ----> could just read this from file!!!!
+				infile.seekg(offset[v] + 4, ios::beg);
+				infile.read(reinterpret_cast<char *>(&tmp), 4);
+
+				//REPLACE THIS WITH BINARY SEARCH for deg(N) -> log deg (N) speedup
+				bool flag = false;
+				for(k = 0; k < tmp; k++){
+					infile.read(reinterpret_cast<char *>(&tmp), 4);
+					if(tmp == w)
+						flag = true;
+
+				}
+				if(flag){
+					// increase supports
+				}
+			}
 		}
-		cout << endl;
 	}
 
-	// triangle enumeration
-
-
+	// re-check correctness of vertex allocation
 
 	MPI_Finalize();
 	return 0;

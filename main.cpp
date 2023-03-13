@@ -56,7 +56,7 @@ int main(int argc, char* argv[]){
 	// assign vertices to the nodes [ based modulo size ]
 	// node i gets vertices [i, sz + i, 2*sz + i, ...]  ----> check stupid cases ( sz = 1 , seems ok)
 	// edge e = (u, v) then e belongs to processor having lower priority vertex
-	vector<int> V, E;
+	vector<int> V;
 	for(i = id; i < n; i += sz){
 		V.push_back(i);
 	}
@@ -71,19 +71,21 @@ int main(int argc, char* argv[]){
 		for(i = 0; i < tmp; i++){
 			infile.read(reinterpret_cast<char *>(&j), 4);
 			if(prio[j] > prio[v]){
+				// cout << v << " " << j << endl;
 				E[(v - id)/sz].push_back(j);
 			}
 		}
 	}
 	infile.close();
 
-
+	// cout << id << " " << sz << endl;
 	for(i = 0; i < num_nodes; i++){
 		string output = "";
-		for(auto u: E[v]){
+		for(auto u: E[i]){
+			cout << u << " ";
 			output += u;
 		}
-		cout << output << endl;
+		cout << endl;
 	}
 
 	// triangle enumeration

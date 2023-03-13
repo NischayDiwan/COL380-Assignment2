@@ -59,7 +59,8 @@ int main(int argc, char* argv[]){
 	// edge e = (u, v) then e belongs to processor having lower priority vertex
 	vector<int> V;
 	for(i = id; i < n; i += sz){
-		V.push_back(deg[i].second);
+		//V.push_back(deg[i].second);
+		V.push_back(i);
 	}
 
 	int num_nodes = V.size();
@@ -86,7 +87,8 @@ int main(int argc, char* argv[]){
 	// triangle enumeration
 	infile.open(filename, ios::in | ios::binary);
 	unordered_map<int, int> processed;
-	for(auto u: V){
+	for(auto u1: V){
+		int u = (u1-id)/sz;
 		for(i = 0; i < E[u].size(); i++){
 			for(j = i + 1; j < E[u].size(); j++){	// have to go over all ???
 				//if(i == j)	

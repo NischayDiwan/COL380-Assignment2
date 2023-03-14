@@ -96,7 +96,7 @@ int main(int argc, char* argv[]){
 	infile.close();
 
 	// count of (x, y) in a triangle
-	map<pair<int, int>, int> supp;
+	map<pair<int, int>, vector<int>> supp;
 
 	// triangle enumeration
 	infile.open(filename, ios::in | ios::binary);
@@ -120,10 +120,12 @@ int main(int argc, char* argv[]){
 				else if(binary_search(adj.begin(), adj.end(), w)){
 					// increment support
 					if(supp.find({u, v})!=supp.end()){
-						supp[{u, v}]++;
+						supp[{u, v}].push_back(w);
 					}
 					else{
-						supp.insert({{u, v}, 1});
+						vector<int> throwaway;
+						throwaway.push_back(w);
+						supp.insert({{u, v}, throwaway});
 					}
 				}
 			}
@@ -134,10 +136,60 @@ int main(int argc, char* argv[]){
 	//cout << endl << "done counting " << endl << endl;
 	for(auto e: supp){
 		pair<int, int> x = e.first;
-		cout << x.first << " " << x.second << " " << e.second << endl;
+		cout << x.first << " " << x.second << " " << e.second.size() << endl;
 	}
 
+	set<pair<int, pair<int, int>>> active;
+	vector<pair<pair<int, int>, int >> T;
 
+	for(auto e: supp){
+		pair<int, int> x = e.first;
+		active.insert({e.second.size() + 2, {x.first, x.second}});
+	}
+
+	bool done = false, action = false;
+	if(active.size() == 0){
+		done = true;
+	}
+
+	MPI_Allreduce(&done, &action, 1, MPI_LOGICAL, MPI_LAND, MPI_COMM_WORLD);
+	action = not action;
+	
+	while(action){
+		if(!done){
+			int min = (*active.begin()).first;
+			set<pair<int, pair<int, int>>>::iterator itrs1 = active.begin(), itr2 = active.begin();
+			vector<pair<int, int>> cur;
+			for(; itr2 != active.end(); itr2++){
+				if((*itr2).first > min)
+					break;
+				else{
+					pair<int, int> x = (*itr2).second;
+					cur.push_back(x);
+					T.push_back({x, (*itr2).first});
+				}
+			}
+			active.erase(itr1, itr2);
+
+			for(auto e: cur){
+				for(auto w: supp[{e.first, e.second}]){
+					// send msg w to rank : (w % sz)
+					/*int hj;
+					MPI_Request req;
+					MPI_Isend(&w, 1, MPI_INT, w%sz, id, MPI_COMM_WORLD, &req);
+					MPI_Irecv(&hj, 1, MPI_INT, )*/
+				}
+			}
+
+
+
+			if(active.size() == 0)
+				done = true;
+		}
+
+		MPI_Allreduce(&done, &action, 1, MPI_LOGICAL, MPI_LAND, MPI_COMM_WORLD);
+		action = not action;
+	}
 
 	// time measure
 	endt = MPI_Wtime();

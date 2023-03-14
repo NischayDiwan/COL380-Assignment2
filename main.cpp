@@ -53,8 +53,9 @@ int main(int argc, char* argv[]){
 	// establish order on vertices based on degree
 	sort(deg, deg + n);
 	for(i = 0; i < n; i++){
-		prio[deg[i].second] = n - i;
+		prio[deg[i].second] = i;
 		//cout << deg[i].first << " " << deg[i].second << "\n";
+		//cout << deg[i].second << " ";
 	}
 
 	// assign vertices to the nodes [ based modulo size ]
@@ -77,9 +78,8 @@ int main(int argc, char* argv[]){
 		infile.read(reinterpret_cast<char *>(&tmp), 4);
 		for(i = 0; i < tmp; i++){
 			infile.read(reinterpret_cast<char *>(&j), 4);
-			//if(prio[j] > prio[v]){
-			if(true){
-				E[count].push_back(j);
+			E[count].push_back(j);
+			if(prio[j] > prio[v]){
 				target.insert(j);
 				if(par.find(j)!=par.end()){
 					par[j].push_back(v);
@@ -102,6 +102,7 @@ int main(int argc, char* argv[]){
 	infile.open(filename, ios::in | ios::binary);
 	// iterate over (u, v, w) with u < v and u < w. Check if vw exists
 	// first loop over all v? so that we can read into vector --> then loop over vertices of current processor? 
+	map<pair<pair<int, int>, int>, bool> processed;
 	for(auto v: target){
 		vector<int> adj;
 		infile.seekg(offset[v] + 4, ios::beg);
@@ -111,13 +112,12 @@ int main(int argc, char* argv[]){
 			adj.push_back(tmp);
 		}
 		for(auto u: par[v]){
-			if(v <= u)
-				continue;
+			/*if(v <= u)
+				continue; */
 			for(auto w: E[(u - id)/sz]){
-				if(w <= v)
+				if(v == w)
 					continue;
-				// check if vw is an edge in G
-				if(binary_search(adj.begin(), adj.end(), w)){
+				else if(binary_search(adj.begin(), adj.end(), w)){
 					// increment support
 					if(supp.find({u, v})!=supp.end()){
 						supp[{u, v}]++;
@@ -125,23 +125,18 @@ int main(int argc, char* argv[]){
 					else{
 						supp.insert({{u, v}, 1});
 					}
-					if(supp.find({u, w})!=supp.end()){
-						supp[{u, w}]++;
-					}
-					else{
-						supp.insert({{u, w}, 1});
-					}
 				}
 			}
 		}
 	}
 	infile.close();
 	// supp[u, v] stores support of edge (u, v) in current processor
-	/*for(auto e: supp){
+	//cout << endl << "done counting " << endl << endl;
+	for(auto e: supp){
 		pair<int, int> x = e.first;
-		if(x.first < x.second)
-			cout << x.first << " " << x.second << " " << e.second << endl;
-	}*/
+		cout << x.first << " " << x.second << " " << e.second << endl;
+	}
+
 
 
 	// time measure

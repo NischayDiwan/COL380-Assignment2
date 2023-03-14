@@ -223,6 +223,7 @@ int main(int argc, char* argv[]){
 				}
 				b[4] = dst1; b[8] = dst2;
 			}
+			//parallel
 			MPI_Request msreq;
 			MPI_Isend(b, 9, MPI_INT, 0, id, MPI_COMM_WORLD, &msreq);
 			int num_packets[sz], payload = 0;
@@ -265,6 +266,11 @@ int main(int argc, char* argv[]){
 				MPI_Recv(rec, 3, MPI_INT, 0, id, MPI_COMM_WORLD, &stat);
 				proc.push_back({{rec[0], rec[1]}, rec[2]});
 			}
+
+			// sequential
+			// vector<pair<pair<int, int>, int>> proc;
+			// proc.push_back({{b[1], b[2]}, b[3]});
+			// proc.push_back({{b[5], b[6]}, b[7]});
 
 			for(auto x: proc){
 				pair<int, int> e = x.first;

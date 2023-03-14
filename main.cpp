@@ -102,15 +102,17 @@ int main(int argc, char* argv[]){
 	infile.open(filename, ios::in | ios::binary);
 	// iterate over (u, v, w) with u < v and u < w. Check if vw exists
 	// first loop over all v? so that we can read into vector --> then loop over vertices of current processor? 
-	for(auto& v: target){
+	for(auto v: target){
 		vector<int> adj;
 		infile.seekg(offset[v] + 4, ios::beg);
 		infile.read(reinterpret_cast<char *>(&count), 4);
-		for(i = 0; i < tmp; i++){
+		for(i = 0; i < count; i++){
 			infile.read(reinterpret_cast<char *>(&tmp), 4);
 			adj.push_back(tmp);
 		}
 		for(auto u: par[v]){
+			if(v <= u)
+				continue;
 			for(auto w: E[(u - id)/sz]){
 				if(w <= v)
 					continue;
@@ -135,11 +137,11 @@ int main(int argc, char* argv[]){
 	}
 	infile.close();
 	// supp[u, v] stores support of edge (u, v) in current processor
-
-	for(auto& e: supp){
+	/*for(auto e: supp){
 		pair<int, int> x = e.first;
-		cout << x.first << " " << x.second << " " << e.second << endl;
-	}
+		if(x.first < x.second)
+			cout << x.first << " " << x.second << " " << e.second << endl;
+	}*/
 
 
 	// time measure

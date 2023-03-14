@@ -158,7 +158,7 @@ int main(int argc, char* argv[]){
 	while(action){
 		if(!done){
 			int min = (*active.begin()).first;
-			set<pair<int, pair<int, int>>>::iterator itrs1 = active.begin(), itr2 = active.begin();
+			set<pair<int, pair<int, int>>>::iterator itr1 = active.begin(), itr2 = active.begin();
 			vector<pair<int, int>> cur;
 			for(; itr2 != active.end(); itr2++){
 				if((*itr2).first > min)
@@ -170,14 +170,24 @@ int main(int argc, char* argv[]){
 				}
 			}
 			active.erase(itr1, itr2);
-
 			for(auto e: cur){
 				for(auto w: supp[{e.first, e.second}]){
 					// send msg w to rank : (w % sz)
-					/*int hj;
+					// b, u, v, w, dst1 -> u, w, dst2 -> v, w
+					// master 6n sends 
+					int u = e.first, v = e.second;
+					int b[7];
+					if (id == 0){
+						for (int tid = 0; tid < sz; tid++){
+							MPI_Request req;
+							MPI_Irecv(&b, 1, MPI_INT, tid, tid, MPI_COMM_WORLD, &req);
+						}
+					}
+					
+
 					MPI_Request req;
 					MPI_Isend(&w, 1, MPI_INT, w%sz, id, MPI_COMM_WORLD, &req);
-					MPI_Irecv(&hj, 1, MPI_INT, )*/
+					MPI_Irecv(&hj, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &req);
 				}
 			}
 

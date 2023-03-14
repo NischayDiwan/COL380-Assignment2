@@ -134,71 +134,158 @@ int main(int argc, char* argv[]){
 	infile.close();
 	// supp[u, v] stores support of edge (u, v) in current processor
 	//cout << endl << "done counting " << endl << endl;
-	for(auto e: supp){
+	/*for(auto e: supp){
 		pair<int, int> x = e.first;
 		cout << x.first << " " << x.second << " " << e.second.size() << endl;
-	}
+	}*/
 
 	set<pair<int, pair<int, int>>> active;
+	map<pair<int, int>, int> hashtable;
 	vector<pair<pair<int, int>, int >> T;
 
 	for(auto e: supp){
 		pair<int, int> x = e.first;
-		active.insert({e.second.size() + 2, {x.first, x.second}});
+		active.insert({e.second.size() + 2, x});
+		hashtable.insert({x, e.second.size() + 2});
 	}
 
-	bool done = false, action = false;
+	bool done = 0, action = 0;
 	if(active.size() == 0){
-		done = true;
+		done = 1;
 	}
+	MPI_Allreduce(&done, &action, 1, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
+	action = 1 - action;
 
-	MPI_Allreduce(&done, &action, 1, MPI_LOGICAL, MPI_LAND, MPI_COMM_WORLD);
-	action = not action;
-	
 	while(action){
+		vector<pair<int, int>> cur;
+		int min = 100;
+		if(active.size()!=0){
+			min = (*active.begin()).first;
+		}
+		int global_min = 100;
+		MPI_Allreduce(&min, &global_min, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+
 		if(!done){
-			int min = (*active.begin()).first;
+			if(active.size() == 0)
+				done = 1;
 			set<pair<int, pair<int, int>>>::iterator itr1 = active.begin(), itr2 = active.begin();
-			vector<pair<int, int>> cur;
 			for(; itr2 != active.end(); itr2++){
-				if((*itr2).first > min)
+				if((*itr2).first > global_min){
 					break;
+				}
 				else{
 					pair<int, int> x = (*itr2).second;
 					cur.push_back(x);
 					T.push_back({x, (*itr2).first});
+					hashtable.erase(x);
 				}
 			}
 			active.erase(itr1, itr2);
-			for(auto e: cur){
-				for(auto w: supp[{e.first, e.second}]){
-					// send msg w to rank : (w % sz)
-					// b, u, v, w, dst1 -> u, w, dst2 -> v, w
-					// master 6n sends 
-					int u = e.first, v = e.second;
-					int b[7];
-					if (id == 0){
-						for (int tid = 0; tid < sz; tid++){
-							MPI_Request req;
-							MPI_Irecv(&b, 1, MPI_INT, tid, tid, MPI_COMM_WORLD, &req);
-						}
+			
+		}
+		vector<pair<pair<int, int>, int>> W;
+		for(auto e: cur){
+			for(auto w: supp[{e.first, e.second}]){
+				W.push_back({e, w});
+			}
+		}
+		int ptr = 0;
+		while(true){
+			// dst1 for (u, w) edge  and   dst2 for (v, w) edge
+			int b[7], u = 0, v = 0, w = 0, dst1 = 0, dst2 = 0;
+			if(ptr >= W.size()){
+				b[0] = 0;
+			}
+			else{
+				b[0] = 1;
+				u = W[ptr].first.first;
+				v = W[ptr].first.second;
+				w = W[ptr].second;
+				if(prio[u] < prio[w]){
+					dst1 = u % sz;
+					b[1] = u;
+					b[2] = w;
+				}
+				else{
+					dst1 = w %sz;
+					b[1] = w;
+					b[2] = u;
+				}
+				if(prio[v] < prio[w]){
+					dst2 = v % sz;
+					b[4] = v;
+					b[5] = w;
+				}
+				else{
+					dst2 = w % sz;
+					b[4] = w;
+					b[5] = v;
+				}
+				b[3] = dst1; b[6] = dst2;
+			}
+			MPI_Request msreq;
+			MPI_Isend(b, 7, MPI_INT, 0, id, MPI_COMM_WORLD, &msreq);
+			int num_packets[sz], payload = 0;
+			for(i = 0; i < sz; i++){
+				num_packets[i] = 0;
+			}
+			int mb[7*sz];
+			if(id == 0){
+				for(i = 0; i < sz; i++){
+					MPI_Status status;
+					MPI_Recv(mb+7*i, 7, MPI_INT, i, i, MPI_COMM_WORLD, &status);
+					if(mb[7*i] != 0){
+						num_packets[mb[7*i+3]]++;
+						num_packets[mb[7*i+6]]++;
 					}
-					
-
+				}
+				for(i = 0; i < sz; i++){
 					MPI_Request req;
-					MPI_Isend(&w, 1, MPI_INT, w%sz, id, MPI_COMM_WORLD, &req);
-					MPI_Irecv(&hj, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &req);
+					MPI_Isend(&num_packets[i], 1, MPI_INT, i, i, MPI_COMM_WORLD, &req);
+				}
+			}
+
+			MPI_Status status;
+			MPI_Recv(&payload, 1, MPI_INT, 0, id, MPI_COMM_WORLD, &status);
+
+			if(id == 0){
+				for(i = 0; i < sz; i++){
+					if(mb[7*i] == 1){
+						MPI_Request req1, req2;
+						MPI_Isend(mb+7*i+1, 2, MPI_INT, mb[7*i+3], mb[7*i+3], MPI_COMM_WORLD, &req1);
+						MPI_Isend(mb+7*i+4, 2, MPI_INT, mb[7*i+6], mb[7*i+6], MPI_COMM_WORLD, &req2);
+					}
+				}
+			}
+
+			vector<pair<int, int>> proc;
+			int rec[2];
+			for(i = 0; i < payload; i++){
+				MPI_Status stat;
+				MPI_Recv(rec, 2, MPI_INT, 0, id, MPI_COMM_WORLD, &stat);
+				proc.push_back({rec[0], rec[1]});
+			}
+			
+			for(auto e: proc){
+				if(hashtable.find(e) != hashtable.end()){
+					auto erase_itr = active.find({hashtable[e], e});
+					active.erase(erase_itr);
+					hashtable[e]--;
+					active.insert({hashtable[e], e});
 				}
 			}
 
 
-
-			if(active.size() == 0)
-				done = true;
+			ptr++;
+			// break out when all have mb[7k] = 0
+			int b_break = 0;
+			MPI_Allreduce(&b[0], &b_break, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+			if(b_break == 0)
+				break;
 		}
 
-		MPI_Allreduce(&done, &action, 1, MPI_LOGICAL, MPI_LAND, MPI_COMM_WORLD);
-		action = not action;
+		MPI_Allreduce(&done, &action, 1, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
+		action = 1 - action;
 	}
 
 	// time measure
@@ -207,5 +294,11 @@ int main(int argc, char* argv[]){
 		cout << "Time taken: " << endt - startt << "\n";
 	}
 	MPI_Finalize();
+
+	for(auto truss: T){
+		pair<int, int> e = truss.first;
+		cout << "edge " << e.first << " " << e.second << " has truss number " << e.second;
+		cout << endl;
+	}
 	return 0;
 }

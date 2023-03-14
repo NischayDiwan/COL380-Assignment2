@@ -145,8 +145,8 @@ int main(int argc, char* argv[]){
 
 	for(auto e: supp){
 		pair<int, int> x = e.first;
-		active.insert({e.second.size() + 2, x});
-		hashtable.insert({x, e.second.size() + 2});
+		active.insert({e.second.size(), x});
+		hashtable.insert({x, e.second.size()});
 	}
 
 	bool done = 0, action = 0;
@@ -154,20 +154,13 @@ int main(int argc, char* argv[]){
 		done = 1;
 	}
 	MPI_Allreduce(&done, &action, 1, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
-	MPI_Barrier(MPI_COMM_WORLD);
 	action = 1 - action;
-
+	int loop_cnt = 3;
 	while(action){
 		vector<pair<int, int>> cur;
-		int min = INT_MAX;
-		if(active.size()!=0){
-			min = (*active.begin()).first;
-		}
-		int global_min = INT_MAX;
-		MPI_Allreduce(&min, &global_min, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-
+		int global_min = loop_cnt - 3;
 		if(!done){
-			set<pair<int, pair<int, int>>>::iterator itr1 = active.begin(), itr2 = active.begin();
+			auto itr1 = active.begin(), itr2 = active.begin();
 			for(; itr2 != active.end(); itr2++){
 				if((*itr2).first > global_min){
 					break;
@@ -175,7 +168,7 @@ int main(int argc, char* argv[]){
 				else{
 					pair<int, int> x = (*itr2).second;
 					cur.push_back(x);
-					T.push_back({x, (*itr2).first});
+					T.push_back({x, loop_cnt - 1});
 					hashtable.erase(x);
 				}
 			}
@@ -191,6 +184,7 @@ int main(int argc, char* argv[]){
 				W.push_back({e, w});
 			}
 		}
+		
 		int ptr = 0;
 		while(true){
 			// dst1 for (u, w) edge  and   dst2 for (v, w) edge
@@ -271,7 +265,7 @@ int main(int argc, char* argv[]){
 				MPI_Recv(rec, 3, MPI_INT, 0, id, MPI_COMM_WORLD, &stat);
 				proc.push_back({{rec[0], rec[1]}, rec[2]});
 			}
-			
+
 			for(auto x: proc){
 				pair<int, int> e = x.first;
 				int arr[] = {e.first, e.second, x.second};
@@ -281,6 +275,9 @@ int main(int argc, char* argv[]){
 					if(Y.find({{arr[0], arr[1]}, arr[2]}) != Y.end())
 						continue;
 					auto erase_itr = active.find({hashtable[e], e});
+					if(hashtable[e] == global_min){
+						//cout << endl << e.first << " " << e.second << " " << (*active.begin()).first << " " << global_min << endl;
+					}
 					active.erase(erase_itr);
 					hashtable[e]--;
 					active.insert({hashtable[e], e});
@@ -293,14 +290,14 @@ int main(int argc, char* argv[]){
 			// break out when all have mb[7k] = 0
 			int b_break = 0;
 			MPI_Allreduce(&b[0], &b_break, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-			MPI_Barrier(MPI_COMM_WORLD);
 			if(b_break == 0)
 				break;
 		}
 
+
 		MPI_Allreduce(&done, &action, 1, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
-		MPI_Barrier(MPI_COMM_WORLD);
 		action = 1 - action;
+		loop_cnt++;
 	}
 
 	// time measure
@@ -312,8 +309,8 @@ int main(int argc, char* argv[]){
 
 	for(auto truss: T){
 		pair<int, int> e = truss.first;
-		//cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second;
-		//cout << endl;
+		cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second;
+		cout << endl;
 	}
 	return 0;
 }

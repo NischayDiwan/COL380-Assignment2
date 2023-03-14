@@ -59,14 +59,13 @@ int main(int argc, char* argv[]){
 	// edge e = (u, v) then e belongs to processor having lower priority vertex
 	vector<int> V;
 	for(i = id; i < n; i += sz){
-		V.push_back(deg[i].second);
+		V.push_back(i);
 	}
 
 	int num_nodes = V.size();
 	vector<int> E[num_nodes];	// E[u] will stores edges (u, v) with u < v 
-	unordered_set<int> htable[num_nodes];
-	// maybe replace this with faster hash tables?
-
+	unordered_set<int> target;
+	map<int, vector<int> > par;
 	infile.open(filename, ios:: in | ios::binary);
 	int count = 0;
 	for(auto v: V){
@@ -76,46 +75,69 @@ int main(int argc, char* argv[]){
 			infile.read(reinterpret_cast<char *>(&j), 4);
 			if(prio[j] > prio[v]){
 				E[count].push_back(j);
-				htable[count].insert(j);
+				target.insert(j);
+				if(par.find(j)!=par.end()){
+					par[j].push_back(v);
+				}
+				else{
+					vector<int> throwaway;
+					throwaway.push_back(v);
+					par.insert({j, throwaway});
+				}
 			}
 		}
 		count += 1;
 	}
 	infile.close();
 
+	// count of (x, y) in a triangle
+	map<pair<int, int>, int> supp;
+
 	// triangle enumeration
 	infile.open(filename, ios::in | ios::binary);
-	unordered_map<int, int> processed;
-	for(auto u: V){
-		for(i = 0; i < E[u].size(); i++){
-			for(j = i + 1; j < E[u].size(); j++){	// have to go over all ???
-				//if(i == j)	
-				//	continue;
-				v = E[u][i];
-				w = E[u][j];
-				// check if (v, w) was already processed with edge from v to w in processor containing v
-				//if(processed.find(w)!=processed.end() && processed[w]==v)
-				//	continue;
-				// send msg to processor owning v ----> could just read this from file!!!!
-				infile.seekg(offset[v] + 4, ios::beg);
-				infile.read(reinterpret_cast<char *>(&tmp), 4);
-
-				//REPLACE THIS WITH BINARY SEARCH for deg(N) -> log deg (N) speedup
-				bool flag = false;
-				for(k = 0; k < tmp; k++){
-					infile.read(reinterpret_cast<char *>(&tmp), 4);
-					if(tmp == w)
-						flag = true;
-
-				}
-				if(flag){
-					// increase supports
+	// iterate over (u, v, w) with u < v and u < w. Check if vw exists
+	// first loop over all v? so that we can read into vector --> then loop over vertices of current processor? 
+	for(auto& v: target){
+		vector<int> adj;
+		infile.seekg(offset[v] + 4, ios::beg);
+		infile.read(reinterpret_cast<char *>(&count), 4);
+		for(i = 0; i < tmp; i++){
+			infile.read(reinterpret_cast<char *>(&tmp), 4);
+			adj.push_back(tmp);
+		}
+		for(auto u: par[v]){
+			for(auto w: E[(u - id)/sz]){
+				if(prio[w] < prio[v])
+					continue;
+				// check if vw is an edge in G
+				if(binary_search(adj.begin(), adj.end(), w)){
+					// increment support
+					if(supp.find({u, v})!=supp.end()){
+						supp[{u, v}]++;
+					}
+					else{
+						supp.insert({{u, v}, 1});
+					}
+					if(supp.find({u, w})!=supp.end()){
+						supp[{u, w}]++;
+					}
+					else{
+						supp.insert({{u, w}, 1});
+					}
+					if(supp.find({v, w})!=supp.end()){
+						supp[{v, w}]++;
+					}
+					else{
+						supp.insert({{v, w}, 1});
+					}
 				}
 			}
 		}
 	}
+	infile.close();
 
-	// re-check correctness of vertex allocation
+	// have to add up the supports present in some other processor
+
 
 	MPI_Finalize();
 	return 0;

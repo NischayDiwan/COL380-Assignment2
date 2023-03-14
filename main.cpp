@@ -67,7 +67,7 @@ int main(int argc, char* argv[]){
 	}
 
 	int num_nodes = V.size();
-	vector<int> E[num_nodes];	// E[u] will stores edges (u, v) with u < v 
+	vector<int> E[num_nodes];	// E[u] will stores edges (u, v) 
 	unordered_set<int> target;
 	map<int, vector<int> > par;
 	infile.open(filename, ios:: in | ios::binary);
@@ -77,7 +77,8 @@ int main(int argc, char* argv[]){
 		infile.read(reinterpret_cast<char *>(&tmp), 4);
 		for(i = 0; i < tmp; i++){
 			infile.read(reinterpret_cast<char *>(&j), 4);
-			if(prio[j] > prio[v]){
+			//if(prio[j] > prio[v]){
+			if(true){
 				E[count].push_back(j);
 				target.insert(j);
 				if(par.find(j)!=par.end()){
@@ -111,7 +112,7 @@ int main(int argc, char* argv[]){
 		}
 		for(auto u: par[v]){
 			for(auto w: E[(u - id)/sz]){
-				if(prio[w] < prio[v])
+				if(w <= v)
 					continue;
 				// check if vw is an edge in G
 				if(binary_search(adj.begin(), adj.end(), w)){
@@ -128,19 +129,17 @@ int main(int argc, char* argv[]){
 					else{
 						supp.insert({{u, w}, 1});
 					}
-					if(supp.find({v, w})!=supp.end()){
-						supp[{v, w}]++;
-					}
-					else{
-						supp.insert({{v, w}, 1});
-					}
 				}
 			}
 		}
 	}
 	infile.close();
+	// supp[u, v] stores support of edge (u, v) in current processor
 
-	// have to add up the supports present in some other processor
+	for(auto& e: supp){
+		pair<int, int> x = e.first;
+		cout << x.first << " " << x.second << " " << e.second << endl;
+	}
 
 
 	// time measure

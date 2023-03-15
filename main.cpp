@@ -3,6 +3,23 @@
 
 using namespace std;
 
+int find(int x,int *link){
+	while(x != link[x]) x = link[x];
+	return x;
+}
+
+bool same(int a, int b, int *link){
+	return find(a,link) == find(b,link);
+}
+
+void unite(int a, int b, int *link){
+	a = find(a,link);
+	b = find(b,link);
+	if(a < b) swap(a,b);
+	// size[a] += size[b];
+	link[b] = a;
+}
+
 int main(int argc, char* argv[]){
 
 	int i, j, k, n, m, tmp;
@@ -399,11 +416,59 @@ int main(int argc, char* argv[]){
 			outfile.close();
 		}
 	}else if(verbose == 1){
+		// for(auto truss: T){
+		// 	pair<int, int> e = truss.first;
+		// 	if(truss.second >= 0){
+		// 		cout << id << " has edge " << e.first << " " << e.second << " has truss number " << truss.second - 2 << endl;
+		// 	}
+		// }
 		if(id == 0){
+			int link[n];
+			int size[n];
+			for(k = 0; k < n; k++) link[k] = k;
+			for(k = 0; k < n; k++) size[k] = 1;
+			vector<vector<set<int>>> tempg;
+			for(i = endk; i >= startk; i--){
+				// cout << "Truss " << i << endl;
+				set<int> tk;
+				for(j = 0; j < sz; j++){
+					for(auto truss: T){
+						pair<int, int> e = truss.first;
+						if(truss.second - 2 >= i){
+							unite(e.first, e.second, link);
+							tk.insert(e.first);
+							tk.insert(e.second);
+						}
+					}
+				}
+				vector<set<int>> gk;
+				for(j = 0; j < n; j++){
+					if(find(j, link) == j){
+						set<int> comp;
+						for(auto e: tk){
+							if(find(e, link) == j){
+								comp.insert(e);
+							}
+						}
+						if(comp.size() > 0)
+							gk.push_back(comp);
+					}
+				}
+				if(gk.size() > 0)
+					tempg.push_back(gk);
+			}
+			reverse(tempg.begin(), tempg.end());
 			ofstream outfile(outname);
 			for(i = startk; i <= endk; i++){
 				if(i <= maxk){
 					outfile << 1 << "\n";
+					outfile << tempg[i-startk].size() << "\n";
+					for(auto e: tempg[i-startk]){
+						for(auto v: e){
+							outfile << v << " ";
+						}
+						outfile << "\n";
+					}
 				}
 				else{
 					outfile << 0 << "\n";

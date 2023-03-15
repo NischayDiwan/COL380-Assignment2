@@ -239,6 +239,7 @@ int main(int argc, char* argv[]){
 				}
 				b[4] = dst1; b[8] = dst2;
 			}
+			//parallel
 			MPI_Request msreq;
 			MPI_Isend(b, 9, MPI_INT, 0, id, MPI_COMM_WORLD, &msreq);
 
@@ -288,7 +289,7 @@ int main(int argc, char* argv[]){
 				MPI_Recv(rec, 3, MPI_INT, 0, id + i, MPI_COMM_WORLD, &stat);
 				proc.push_back({{rec[0], rec[1]}, rec[2]});
 			}
-			//cout << endl << "processing " << proc.size() << endl;
+
 			for(auto x: proc){
 				pair<int, int> e = x.first;
 				int arr[] = {e.first, e.second, x.second};

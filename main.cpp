@@ -134,14 +134,17 @@ int main(int argc, char* argv[]){
 	infile.close();
 	// supp[u, v] stores support of edge (u, v) in current processor
 	//cout << endl << "done counting " << endl << endl;
-	/*for(auto e: supp){
+	/*int sum = 0;
+	for(auto e: supp){
 		pair<int, int> x = e.first;
 		cout << x.first << " " << x.second << " " << e.second.size() << endl;
+		sum += e.second.size();
 	}*/
 
 	set<pair<int, pair<int, int>>> active;
 	map<pair<int, int>, int> hashtable;
 	vector<pair<pair<int, int>, int >> T;
+	set<pair<pair<int, int>, int>> Y;
 
 	for(auto e: supp){
 		pair<int, int> x = e.first;
@@ -149,20 +152,30 @@ int main(int argc, char* argv[]){
 		hashtable.insert({x, e.second.size()});
 	}
 
-	bool done = 0, action = 0;
+	int done = 0, action = 0;
 	if(active.size() == 0){
 		done = 1;
 	}
+	//MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Allreduce(&done, &action, 1, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
 	action = 1 - action;
 	int loop_cnt = 3;
-	while(action){
+
+	while(action!=0){
 		vector<pair<int, int>> cur;
-		int global_min = loop_cnt - 3;
+		int global_min = loop_cnt - 2;
+
+		/*cout << "NEW ITERTION" << endl;
+		cout << "CURRENT GMIN = " << global_min << endl;
+		for(auto x: active){
+			cout << x.first << " " << x.second.first << " " << x.second.second << endl;
+		}
+		cout << endl << endl;*/
+
 		if(!done){
 			auto itr1 = active.begin(), itr2 = active.begin();
 			for(; itr2 != active.end(); itr2++){
-				if((*itr2).first > global_min){
+				if((*itr2).first >= global_min){
 					break;
 				}
 				else{
@@ -178,13 +191,16 @@ int main(int argc, char* argv[]){
 		}
 
 		vector<pair<pair<int, int>, int>> W;
-		set<pair<pair<int, int>, int>> Y;
 		for(auto e: cur){
 			for(auto w: supp[{e.first, e.second}]){
 				W.push_back({e, w});
 			}
 		}
-		
+		//cout << W.size() << endl;
+		/*for(auto x: W){
+			cout << "( " << x.first.first << " , " << x.first.second << " , " << x.second << " ) ";
+		}*/
+		//cout << endl;
 		int ptr = 0;
 		while(true){
 			// dst1 for (u, w) edge  and   dst2 for (v, w) edge
@@ -225,6 +241,7 @@ int main(int argc, char* argv[]){
 			}
 			MPI_Request msreq;
 			MPI_Isend(b, 9, MPI_INT, 0, id, MPI_COMM_WORLD, &msreq);
+
 			int num_packets[sz], payload = 0;
 			for(i = 0; i < sz; i++){
 				num_packets[i] = 0;
@@ -248,12 +265,18 @@ int main(int argc, char* argv[]){
 			MPI_Status status;
 			MPI_Recv(&payload, 1, MPI_INT, 0, id, MPI_COMM_WORLD, &status);
 
+			int tagid[sz];
+			for(i = 0; i < sz; i++){
+				tagid[i] = 0;
+			}
 			if(id == 0){
 				for(i = 0; i < sz; i++){
 					if(mb[9*i] == 1){
 						MPI_Request req1, req2;
-						MPI_Isend(mb+9*i+1, 3, MPI_INT, mb[9*i+4], mb[9*i+4], MPI_COMM_WORLD, &req1);
-						MPI_Isend(mb+9*i+5, 3, MPI_INT, mb[9*i+8], mb[9*i+8], MPI_COMM_WORLD, &req2);
+						MPI_Isend(mb+9*i+1, 3, MPI_INT, mb[9*i+4], mb[9*i+4] + tagid[mb[9*i+4]]++, MPI_COMM_WORLD, &req1);
+						MPI_Isend(mb+9*i+5, 3, MPI_INT, mb[9*i+8], mb[9*i+8] + tagid[mb[9*i+8]]++, MPI_COMM_WORLD, &req2);
+						// if dst == 0:
+						//		do work
 					}
 				}
 			}
@@ -262,42 +285,47 @@ int main(int argc, char* argv[]){
 			int rec[3];
 			for(i = 0; i < payload; i++){
 				MPI_Status stat;
-				MPI_Recv(rec, 3, MPI_INT, 0, id, MPI_COMM_WORLD, &stat);
+				MPI_Recv(rec, 3, MPI_INT, 0, id + i, MPI_COMM_WORLD, &stat);
 				proc.push_back({{rec[0], rec[1]}, rec[2]});
 			}
-
+			//cout << endl << "processing " << proc.size() << endl;
 			for(auto x: proc){
 				pair<int, int> e = x.first;
 				int arr[] = {e.first, e.second, x.second};
-				sort(arr, arr+3);
+				//sort(arr, arr+3);
 				if(hashtable.find(e) != hashtable.end()){
 					//cout << arr[0] << " " << arr[1] << " " << arr[2] << endl;
-					if(Y.find({{arr[0], arr[1]}, arr[2]}) != Y.end())
-						continue;
-					auto erase_itr = active.find({hashtable[e], e});
-					if(hashtable[e] == global_min){
-						//cout << endl << e.first << " " << e.second << " " << (*active.begin()).first << " " << global_min << endl;
+					if(Y.find({{arr[0], arr[1]}, arr[2]}) == Y.end()){
+						auto erase_itr = active.find({hashtable[e], e});
+						active.erase(erase_itr);
+						hashtable[e]--;
+						active.insert({hashtable[e], e});
+						Y.insert({{arr[0], arr[1]}, arr[2]});
+						/*if(arr[0] == 1){
+							cout << "BOCCHI " << arr[1] << " " << arr[2] << endl;
+						}*/
 					}
-					active.erase(erase_itr);
-					hashtable[e]--;
-					active.insert({hashtable[e], e});
-					Y.insert({{arr[0], arr[1]}, arr[2]});
 				}
 			}
-
 
 			ptr++;
 			// break out when all have mb[7k] = 0
 			int b_break = 0;
+			//MPI_Barrier(MPI_COMM_WORLD);
 			MPI_Allreduce(&b[0], &b_break, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 			if(b_break == 0)
 				break;
 		}
 
-
+		//MPI_Barrier(MPI_COMM_WORLD);
 		MPI_Allreduce(&done, &action, 1, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
 		action = 1 - action;
-		loop_cnt++;
+		// need to map all reduce the below
+		int wsize = W.size();
+		int decision = 0;
+		MPI_Allreduce(&wsize, &decision, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+		if(decision == 0)
+			loop_cnt++;
 	}
 
 	// time measure
@@ -307,10 +335,12 @@ int main(int argc, char* argv[]){
 	}
 	MPI_Finalize();
 
-	for(auto truss: T){
+	/*for(auto truss: T){
 		pair<int, int> e = truss.first;
-		cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second;
-		cout << endl;
-	}
+		if(truss.second >= 0){
+			cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second - 2;
+			cout << endl;
+		}
+	}*/
 	return 0;
 }

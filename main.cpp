@@ -240,31 +240,49 @@ int main(int argc, char* argv[]){
 				b[4] = dst1; b[8] = dst2;
 			}
 			//parallel
-			MPI_Request msreq;
-			MPI_Isend(b, 9, MPI_INT, 0, id, MPI_COMM_WORLD, &msreq);
+			// MPI_Request msreq;
+			// MPI_Isend(b, 9, MPI_INT, 0, id, MPI_COMM_WORLD, &msreq);
 
+			// int num_packets[sz], payload = 0;
+			// for(i = 0; i < sz; i++){
+			// 	num_packets[i] = 0;
+			// }
+			// int mb[9*sz];
+			// if(id == 0){
+			// 	for(i = 0; i < sz; i++){
+			// 		MPI_Status status;
+			// 		MPI_Recv(mb+9*i, 9, MPI_INT, i, i, MPI_COMM_WORLD, &status);
+			// 		if(mb[9*i] != 0){
+			// 			num_packets[mb[9*i+4]]++;
+			// 			num_packets[mb[9*i+8]]++;
+			// 		}
+			// 	}
+			// 	for(i = 0; i < sz; i++){
+			// 		MPI_Request req;
+			// 		MPI_Isend(&num_packets[i], 1, MPI_INT, i, i, MPI_COMM_WORLD, &req);
+			// 	}
+			// }
+
+			// MPI_Status status;
+			// MPI_Recv(&payload, 1, MPI_INT, 0, id, MPI_COMM_WORLD, &status);
+
+			// gather scatter approach
 			int num_packets[sz], payload = 0;
 			for(i = 0; i < sz; i++){
 				num_packets[i] = 0;
 			}
 			int mb[9*sz];
+			MPI_Gather(b, 9, MPI_INT, mb, 9, MPI_INT, 0, MPI_COMM_WORLD);
+			// MPI_Barrier(MPI_COMM_WORLD);
 			if(id == 0){
 				for(i = 0; i < sz; i++){
-					MPI_Status status;
-					MPI_Recv(mb+9*i, 9, MPI_INT, i, i, MPI_COMM_WORLD, &status);
-					if(mb[9*i] != 0){
+					if(mb[9*i] == 1){
 						num_packets[mb[9*i+4]]++;
 						num_packets[mb[9*i+8]]++;
 					}
 				}
-				for(i = 0; i < sz; i++){
-					MPI_Request req;
-					MPI_Isend(&num_packets[i], 1, MPI_INT, i, i, MPI_COMM_WORLD, &req);
-				}
 			}
-
-			MPI_Status status;
-			MPI_Recv(&payload, 1, MPI_INT, 0, id, MPI_COMM_WORLD, &status);
+			MPI_Scatter(num_packets, 1, MPI_INT, &payload, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 			int tagid[sz];
 			for(i = 0; i < sz; i++){
@@ -336,12 +354,12 @@ int main(int argc, char* argv[]){
 	}
 	MPI_Finalize();
 
-	/*for(auto truss: T){
-		pair<int, int> e = truss.first;
-		if(truss.second >= 0){
-			cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second - 2;
-			cout << endl;
-		}
-	}*/
+	// for(auto truss: T){
+	// 	pair<int, int> e = truss.first;
+	// 	if(truss.second >= 0){
+	// 		cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second - 2;
+	// 		cout << endl;
+	// 	}
+	// }
 	return 0;
 }

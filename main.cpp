@@ -26,6 +26,13 @@ int main(int argc, char* argv[]){
 	enk = enk.substr(7, enk.length() - 7);
 	int startk = stoi(stk), endk = stoi(enk);
 
+	string outname = argv[4];
+	outname = outname.substr(13, outname.length() - 13);
+
+	string verb = argv[5];
+	verb = verb.substr(9, verb.length() - 9);
+	int verbose = stoi(verb);
+
 	// store number of nodes and edges
 	ifstream infile(filename, ios::in | ios::binary);
 	infile.read(reinterpret_cast<char *>(&n), 4);
@@ -352,14 +359,36 @@ int main(int argc, char* argv[]){
 	if(id == 0){
 		cout << "Time taken: " << endt - startt << "\n";
 	}
-	MPI_Finalize();
+	
+	int curk = -1, maxk;
 
-	// for(auto truss: T){
-	// 	pair<int, int> e = truss.first;
-	// 	if(truss.second >= 0){
-	// 		cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second - 2;
-	// 		cout << endl;
-	// 	}
-	// }
+	for(auto truss: T){
+		pair<int, int> e = truss.first;
+		curk = max(curk, truss.second - 2);
+		//if(truss.second >= 0){
+			//cout << "edge " << e.first << " " << e.second << " has truss number " << truss.second - 2;
+			//cout << endl;
+		//}
+	}
+
+	MPI_Allreduce(&curk, &maxk, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+	if(verbose == 0){
+		ofstream outfile(outname);
+		for(i = startk; i <= endk; i++){
+			if(i <= maxk){
+				cout << 1 << "\n";
+			}
+			else{
+				cout << 0 << "\n";
+			}
+		}
+		outfile.close();
+	}
+	else{
+		
+	}
+
+	MPI_Finalize();
 	return 0;
 }

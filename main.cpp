@@ -30,7 +30,7 @@ int main(int argc, char* argv[]){
 	outname = outname.substr(13, outname.length() - 13);
 
 	string verb = argv[5];
-	verb = verb.substr(9, verb.length() - 9);
+	verb = verb.substr(10, verb.length() - 10);
 	int verbose = stoi(verb);
 
 	// store number of nodes and edges
@@ -56,6 +56,12 @@ int main(int argc, char* argv[]){
 		deg[i] = {tmp, i};
 	}
 	infile.close();
+
+	// file is read and offset and degree is stored
+	endt = MPI_Wtime();
+	if(id == 0){
+		cout << "File done: " << endt - startt << "\n";
+	}
 
 	// establish order on vertices based on degree
 	sort(deg, deg + n);
@@ -167,6 +173,11 @@ int main(int argc, char* argv[]){
 	MPI_Allreduce(&done, &action, 1, MPI_INT, MPI_PROD, MPI_COMM_WORLD);
 	action = 1 - action;
 	int loop_cnt = 3;
+
+	endt = MPI_Wtime();
+	if(id == 0){
+		cout << "Truss computation start: " << endt - startt << "\n";
+	}
 
 	while(action!=0){
 		vector<pair<int, int>> cur;
@@ -315,6 +326,9 @@ int main(int argc, char* argv[]){
 				proc.push_back({{rec[0], rec[1]}, rec[2]});
 			}
 
+			// endt = MPI_Wtime();
+			// cout << "My rank: " << id << " Got dts :" << endt - startt << "\n";
+
 			for(auto x: proc){
 				pair<int, int> e = x.first;
 				int arr[] = {e.first, e.second, x.second};
@@ -353,13 +367,12 @@ int main(int argc, char* argv[]){
 		if(decision == 0)
 			loop_cnt++;
 	}
-
-	// time measure
+	
 	endt = MPI_Wtime();
 	if(id == 0){
-		cout << "Time taken: " << endt - startt << "\n";
+		cout << "Truss computation end: " << endt - startt << "\n";
 	}
-	
+
 	int curk = -1, maxk;
 
 	for(auto truss: T){
@@ -372,21 +385,37 @@ int main(int argc, char* argv[]){
 	}
 
 	MPI_Allreduce(&curk, &maxk, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-
 	if(verbose == 0){
-		ofstream outfile(outname);
-		for(i = startk; i <= endk; i++){
-			if(i <= maxk){
-				cout << 1 << "\n";
+		if(id == 0){
+			ofstream outfile(outname);
+			for(i = startk; i <= endk; i++){
+				if(i <= maxk){
+					outfile << 1 << "\n";
+				}
+				else{
+					outfile << 0 << "\n";
+				}
 			}
-			else{
-				cout << 0 << "\n";
-			}
+			outfile.close();
 		}
-		outfile.close();
+	}else if(verbose == 1){
+		if(id == 0){
+			ofstream outfile(outname);
+			for(i = startk; i <= endk; i++){
+				if(i <= maxk){
+					outfile << 1 << "\n";
+				}
+				else{
+					outfile << 0 << "\n";
+				}
+			}
+			outfile.close();
+		}
 	}
-	else{
-		
+
+	endt = MPI_Wtime();
+	if(id == 0){
+		cout << "Time taken: " << endt - startt << "\n";
 	}
 
 	MPI_Finalize();

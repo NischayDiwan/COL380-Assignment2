@@ -31,7 +31,9 @@ int main(int argc, char* argv[]){
 	MPI_Comm_rank(MPI_COMM_WORLD, &id);
 	MPI_Comm_size(MPI_COMM_WORLD, &sz);
 	startt = MPI_Wtime();
-
+	// if(id == 0){
+	// 	cout << "num procs:" << sz << endl;
+	// }
 	// read input arguments
 	string header = argv[3];
 	header = header.substr(13, header.length() - 13);	// check 13 ?!
@@ -457,7 +459,8 @@ int main(int argc, char* argv[]){
 			for(k = 0; k < n; k++) link[k] = k;
 			// for(k = 0; k < n; k++) size[k] = 1;
 			vector<vector<set<int>>> tempg;
-			for(i = maxk; i >= startk; i--){
+			int dok = min(endk,maxk);
+			for(i = dok; i >= startk; i--){
 				// cout << "Truss " << i << endl;
 				set<int> tk;
 				currtrussize = i+2;

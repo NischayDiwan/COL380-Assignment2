@@ -1,18 +1,18 @@
 #include<bits/stdc++.h>
 #include<mpi.h>
-
+// #pragma GCC optimize("unroll-loops")
 using namespace std;
 
-int find(int x,int *link){
+int find(int x,vector<int> &link){
 	while(x != link[x]) x = link[x];
 	return x;
 }
 
-bool same(int a, int b, int *link){
+bool same(int a, int b,vector<int> &link){
 	return find(a,link) == find(b,link);
 }
 
-void unite(int a, int b, int *link){
+void unite(int a, int b,vector<int> &link){
 	a = find(a,link);
 	b = find(b,link);
 	if(a < b) swap(a,b);
@@ -56,13 +56,13 @@ int main(int argc, char* argv[]){
 	infile.read(reinterpret_cast<char *>(&m), 4);
 	infile.close();
 
-	pair<int, int> deg[n]; // store ( deg[v], v )
-	int offset[n], prio[n];	// stores the offset of i'th node
+	vector<pair<int, int>> deg(n, {0,0}); // store ( deg[v], v )
+	vector<int> offset(n,0), prio(n,0);	// stores the offset of i'th node
 
 	// vertex i starts at 4*i bytes in header
 	ifstream hfile(header, ios::in | ios::binary);
 	for(i = 0; i < n; i++){
-		hfile.read(reinterpret_cast<char *>(offset + i), 4);	// stores offset
+		hfile.read(reinterpret_cast<char *>(&offset[i]), 4);	// stores offset
 	}
 	hfile.close();
 
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]){
 	}
 
 	// establish order on vertices based on degree
-	sort(deg, deg + n);
+	sort(deg.begin(), deg.end());
 	for(i = 0; i < n; i++){
 		prio[deg[i].second] = i;
 		//cout << deg[i].first << " " << deg[i].second << "\n";
@@ -98,7 +98,8 @@ int main(int argc, char* argv[]){
 	}
 
 	int num_nodes = V.size();
-	vector<int> E[num_nodes];	// E[u] will stores edges (u, v) 
+	vector<int> zer;
+	vector<vector<int>> E(num_nodes,zer);	// E[u] will stores edges (u, v) 
 	unordered_set<int> target;
 	map<int, vector<int> > par;
 	infile.open(filename, ios:: in | ios::binary);
@@ -415,32 +416,77 @@ int main(int argc, char* argv[]){
 			}
 			outfile.close();
 		}
+
+		endt = MPI_Wtime();
+		if(id == 0){
+			cout << "Verbose 0: " << endt - startt << "\n";
+		}
+
 	}else if(verbose == 1){
+		// vector<vector<pair<pair<int, int>,int>>> Tr;
+		// int temp_truss_no = 0;
+		// vector<pair<pair<int, int>,int>> temp_bin;
+		// Tr.push_back(temp_bin);
 		// for(auto truss: T){
-		// 	pair<int, int> e = truss.first;
 		// 	if(truss.second >= 0){
+		// 		if(truss.second - 2 == temp_truss_no){
+		// 			Tr[temp_truss_no].push_back(truss);
+		// 		}
+		// 		else{
+		// 			temp_truss_no++;
+		// 			vector<pair<pair<int, int>,int>> temp_bin1;
+		// 			temp_bin1.push_back(truss);
+		// 			Tr.push_back(temp_bin1);
+		// 		}
+		// 	}
+		// }
+
+		// for(auto truss: T){
+		// 	if(truss.second >= 0){
+		// 		pair<int, int> e = truss.first;
 		// 		cout << id << " has edge " << e.first << " " << e.second << " has truss number " << truss.second - 2 << endl;
 		// 	}
 		// }
+		MPI_Barrier(MPI_COMM_WORLD);
+		int currtrussize = 0;
+		int tedct[sz];
+		// mpi send recieve left
 		if(id == 0){
-			int link[n];
-			int size[n];
+			vector<int> link(n,0);
+			// int size[n];
 			for(k = 0; k < n; k++) link[k] = k;
-			for(k = 0; k < n; k++) size[k] = 1;
+			// for(k = 0; k < n; k++) size[k] = 1;
 			vector<vector<set<int>>> tempg;
-			for(i = endk; i >= startk; i--){
+			for(i = maxk; i >= startk; i--){
 				// cout << "Truss " << i << endl;
 				set<int> tk;
-				for(j = 0; j < sz; j++){
-					for(auto truss: T){
-						pair<int, int> e = truss.first;
-						if(truss.second - 2 >= i){
-							unite(e.first, e.second, link);
-							tk.insert(e.first);
-							tk.insert(e.second);
-						}
+				currtrussize = i+2;
+				MPI_Bcast(&currtrussize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				int edct = 0;
+				for(auto truss: T){
+					pair<int, int> e = truss.first;
+					if(truss.second >= currtrussize){
+						edct++;
+						unite(e.first, e.second, link);
+						tk.insert(e.first);
+						tk.insert(e.second);
 					}
 				}
+				MPI_Gather(&edct, 1, MPI_INT, &tedct, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				for(j = 1; j < sz; j++){
+					// cout << tedct[j] << endl;
+					for(int jc = 0; jc < tedct[j]; jc++){
+						int ed[2];
+						// MPI_Status jstat;
+						MPI_Recv(&ed, 2, MPI_INT, j, j, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+						// MPI_Wait(&jstat, MPI_STATUS_IGNORE);
+						unite(ed[0], ed[1], link);
+						tk.insert(ed[0]);
+						tk.insert(ed[1]);
+					}
+					
+				}
+				// cout << endl;
 				vector<set<int>> gk;
 				for(j = 0; j < n; j++){
 					if(find(j, link) == j){
@@ -457,7 +503,7 @@ int main(int argc, char* argv[]){
 				if(gk.size() > 0)
 					tempg.push_back(gk);
 			}
-			reverse(tempg.begin(), tempg.end());
+			std::reverse(tempg.begin(), tempg.end());
 			ofstream outfile(outname);
 			for(i = startk; i <= endk; i++){
 				if(i <= maxk){
@@ -475,14 +521,41 @@ int main(int argc, char* argv[]){
 				}
 			}
 			outfile.close();
+		}else{
+			for(i = maxk; i >= startk; i--){
+				MPI_Bcast(&currtrussize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				// cout << id << " has currtrussize?: " << currtrussize << endl;
+				int edct = 0;
+				for(auto truss: T){
+					pair<int, int> e = truss.first;
+					if(truss.second >= currtrussize){
+						edct++;
+					}
+				}
+				MPI_Gather(&edct, 1, MPI_INT, &tedct, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				for(auto truss: T){
+					pair<int, int> e = truss.first;
+					if(truss.second >= currtrussize){
+						int ed[2];
+						ed[0] = e.first;
+						ed[1] = e.second;
+						MPI_Send(&ed, 2, MPI_INT, 0, id, MPI_COMM_WORLD);
+					}
+				}
+			}
+		}
+
+		endt = MPI_Wtime();
+		if(id == 0){
+			cout << "Verbose 1: " << endt - startt << "\n";
 		}
 	}
 
+	//finsihed
 	endt = MPI_Wtime();
 	if(id == 0){
 		cout << "Time taken: " << endt - startt << "\n";
 	}
-
 	MPI_Finalize();
 	return 0;
 }

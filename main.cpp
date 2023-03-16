@@ -452,14 +452,15 @@ int main(int argc, char* argv[]){
 		MPI_Barrier(MPI_COMM_WORLD);
 		int currtrussize = 0;
 		int tedct[sz];
+		int dok = min(endk,maxk);
 		// mpi send recieve left
 		if(id == 0){
 			vector<int> link(n,0);
 			// int size[n];
 			for(k = 0; k < n; k++) link[k] = k;
 			// for(k = 0; k < n; k++) size[k] = 1;
-			vector<vector<set<int>>> tempg;
-			int dok = min(endk,maxk);
+			vector<vector<vector<int>>> tempg;
+			
 			for(i = dok; i >= startk; i--){
 				// cout << "Truss " << i << endl;
 				set<int> tk;
@@ -477,7 +478,7 @@ int main(int argc, char* argv[]){
 				}
 				MPI_Gather(&edct, 1, MPI_INT, &tedct, 1, MPI_INT, 0, MPI_COMM_WORLD);
 				for(j = 1; j < sz; j++){
-					// cout << tedct[j] << endl;
+					cout << tedct[j] << endl;
 					for(int jc = 0; jc < tedct[j]; jc++){
 						int ed[2];
 						// MPI_Status jstat;
@@ -490,22 +491,25 @@ int main(int argc, char* argv[]){
 					
 				}
 				// cout << endl;
-				vector<set<int>> gk;
-				for(j = 0; j < n; j++){
-					if(find(j, link) == j){
-						set<int> comp;
-						for(auto e: tk){
-							if(find(e, link) == j){
-								comp.insert(e);
-							}
-						}
-						if(comp.size() > 0)
-							gk.push_back(comp);
+				map<int, vector<int>> rep;
+				for(auto e: tk){
+					if(rep.find(find(e, link)) == rep.end()){
+						vector<int> temp;
+						temp.push_back(e);
+						rep[find(e, link)] = temp;
+					}
+					else{
+						rep[find(e, link)].push_back(e);
 					}
 				}
-				if(gk.size() > 0)
-					tempg.push_back(gk);
+
+				vector<vector<int>> gk;
+				for(auto x: rep){
+					gk.push_back(x.second);
+				}
+				tempg.push_back(gk);
 			}
+
 			std::reverse(tempg.begin(), tempg.end());
 			ofstream outfile(outname);
 			for(i = startk; i <= endk; i++){
@@ -525,9 +529,9 @@ int main(int argc, char* argv[]){
 			}
 			outfile.close();
 		}else{
-			for(i = maxk; i >= startk; i--){
+			for(i = dok; i >= startk; i--){
 				MPI_Bcast(&currtrussize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-				// cout << id << " has currtrussize?: " << currtrussize << endl;
+				//cout << id << " has currtrussize?: " << currtrussize << endl;
 				int edct = 0;
 				for(auto truss: T){
 					pair<int, int> e = truss.first;
@@ -536,6 +540,8 @@ int main(int argc, char* argv[]){
 					}
 				}
 				MPI_Gather(&edct, 1, MPI_INT, &tedct, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				// MPI_Barrier(MPI_COMM_WORLD);
+				//cout << id << "is ready to send" << endl;
 				for(auto truss: T){
 					pair<int, int> e = truss.first;
 					if(truss.second >= currtrussize){
@@ -545,6 +551,7 @@ int main(int argc, char* argv[]){
 						MPI_Send(&ed, 2, MPI_INT, 0, id, MPI_COMM_WORLD);
 					}
 				}
+				//cout << id << "has sent" << endl;
 			}
 		}
 
@@ -556,9 +563,7 @@ int main(int argc, char* argv[]){
 
 	//finsihed
 	endt = MPI_Wtime();
-	if(id == 0){
-		cout << "Time taken: " << endt - startt << "\n";
-	}
+	cout << id << " has finished, Time taken: " << endt - startt  << endl;
 	MPI_Finalize();
 	return 0;
 }

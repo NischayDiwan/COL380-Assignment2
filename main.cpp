@@ -478,7 +478,7 @@ int main(int argc, char* argv[]){
 				}
 				MPI_Gather(&edct, 1, MPI_INT, &tedct, 1, MPI_INT, 0, MPI_COMM_WORLD);
 				for(j = 1; j < sz; j++){
-					cout << tedct[j] << endl;
+					// cout << tedct[j] << endl;
 					for(int jc = 0; jc < tedct[j]; jc++){
 						int ed[2];
 						// MPI_Status jstat;
